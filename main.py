@@ -113,7 +113,7 @@ class Body(object):
     def required_timesteps(self):
          return max(round(1 / (1 - (self.speed()**2)/(C**2)) * self.system.dynamic_time_factor), self.system.time_resolution)
 
-    def render(self, surface):
+    def render(self, surface, render_label):
         vpos = ((self.pos + self.system.translation) / self.system.sf + 400).astype(int)
         vrad = max(int(self.radius / (self.system.sf * self.system.radius_sf)), 0)
 
@@ -125,7 +125,10 @@ class Body(object):
 
         pygame.draw.circle(surface, (20, 20, 20, 30), vpos, int(self.schwarzchild_radius() / (self.system.sf * self.system.radius_sf)))
         pygame.draw.circle(surface, (255, 255, 255), vpos, vrad)
-        label = FONT.render("%s (%fc)" % (self.name, math.hypot(self.vel[0], self.vel[1]) / 299792458), 1, (255, 255, 255))
+        if render_label:
+           label = FONT.render("%s (%fc)" % (self.name, math.hypot(self.vel[0], self.vel[1]) / 299792458), 1, (255, 255, 255))
+        else:
+            label = FONT.render("", 1, (0,0,0))
         surface.blit(label, (vpos[0] + 1/SQRT_2*vrad, vpos[1] + 1/SQRT_2*vrad))
 
 class System(object):
@@ -171,9 +174,17 @@ class System(object):
             self.last_scaled_dt = scaled_dt
     
     def render(self, surface):
-        for body in self.bodies:
-            body.render(surface)
-        
+        # render the sun
+        self.bodies[0].render(surface, True)
+        i = 1
+        while i < len(self.bodies):
+            current_body = self.bodies[i]
+            previous_body = self.bodies[i - 1]
+            # only render_label if far enough
+            render_label =  current_body.dist(previous_body) > 10 ** 10
+            current_body.render(surface, render_label)
+            i += 1
+                
         following_name = "-" if self.following_index == None else self.bodies[self.following_index].name
         label = FONT.render("ts: %f; sts: %f; following %s" % (self.timescale, self.last_scaled_dt, following_name), 1, (0, 0, 0), (255, 255, 255))
         surface.blit(label, (0, 0))
@@ -183,6 +194,7 @@ def normalize(v):
     if norm == 0:
         return v
     return v / norm
+
 
 def main():
     global FONT
